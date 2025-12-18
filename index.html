@@ -4,32 +4,222 @@
 <head>
   <title>Ma première app AR</title>
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script> 
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script defer>
+    // https://github.com/nikolaiwarner/aframe-chromakey-material
+    AFRAME.registerShader("chromakey", {
+      schema: {
+        src: { type: "map" },
+        color: {
+          default: { x: 0.0, y: 1.0, z: 0.0 },
+          type: "vec3",
+          is: "uniform",
+        },
+        chroma: { type: "bool", is: "uniform" },
+        transparent: { default: true, is: "uniform" },
+      },
+
+      init: function (data) {
+        const videoEl = data.src;
+        document.addEventListener("click", () => {
+          videoEl.play();
+          const entity = document.querySelector("[sound]");
+          // console.log(entity)
+          // console.log(document.querySelector("#debug-marker"))
+          entity.components.sound.playSound();
+        });
+
+        var videoTexture = new THREE.VideoTexture(data.src);
+        videoTexture.minFilter = THREE.LinearFilter;
+        this.material = new THREE.ShaderMaterial({
+          uniforms: {
+            chroma: {
+              type: "b",
+              value: data.chroma,
+            },
+            color: {
+              type: "c",
+              value: data.color,
+            },
+            myTexture: {
+              type: "t",
+              value: videoTexture,
+            },
+          },
+          vertexShader: `
+            varying vec2 vUv;
+
+            void main(void)
+            {
+              vUv = uv;
+              vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+              uniform sampler2D myTexture;
+              uniform vec3 color;
+              uniform bool chroma;
+              varying vec2 vUv;
+
+              void main(void)
+              {
+                vec3 tColor = texture2D( myTexture, vUv ).rgb;
+                float a;
+                if(chroma == true){
+                   a = (length(tColor - color) - 0.5) * 7.0;
+                }
+                else {
+                  a = 1.0;
+                }
+
+                gl_FragColor = vec4(tColor, a);
+              }
+            `,
+        });
+      },
+
+      update: function (data) {
+        this.material.color = data.color;
+        this.material.src = data.src;
+        this.material.transparent = data.transparent;
+      },
+    });
+    AFRAME.registerComponent("audiohandler", {
+      init: function () {
+        this.trackedElements = document.querySelectorAll(
+          "a-marker[audiohandler]"
+        );
+        // console.log(this.trackedElements);
+      },
+      tick: function () {
+        this.trackedElements.forEach((marker) => {
+          const vid = document.querySelector(
+            marker.attributes.vidReference.value
+          );
+          const sound = document.querySelector(
+            marker.attributes.audioReference.value
+          );
+          if (marker.object3D.visible) {
+            if (vid && vid.paused) {
+              vid.play();
+            }
+            if (sound && sound.paused) {
+              sound.play();
+            }
+          } else {
+            if (vid && !vid.paused) {
+              vid.pause();
+              vid.currentTime = 0;
+            }
+            if (sound && !sound.paused) {
+              sound.pause();
+              sound.currentTime = 0;
+            }
+          }
+        });
+      },
+    });
+
+
+    AFRAME.registerComponent("vidhandler", {
+      trackedElements: null,
+
+      init: function () {
+        this.trackedElements = document.querySelectorAll(
+          "a-marker[vidhandler]"
+        );
+       // console.log(this.trackedElements);
+      },
+      tick: function () {
+        // if(!userConsent){
+        //   return;
+        // }
+
+        this.trackedElements.forEach((marker) => {
+          if (marker.object3D.visible) {
+            const vid = document.querySelector(
+              marker.attributes.vidreference.value
+            );
+           // console.log(vid)        
+            if (vid.paused) {
+              vid.play();
+            }
+          } else {
+            const vid = document.querySelector(
+              marker.attributes.vidreference.value
+            );
+          }
+        });
+      },
+    });
+  </script>
+
 </head>
 
 <body>
-    <a-scene embedded
+  <a-scene embedded
     arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best ; changeMatrixMode: modelViewMatrix;"
     renderer="sortObjects: true; antialias: true; colorManagement: true; logarithmicDepthBuffer: true;"
-
-    vr-mode-ui="enabled: false"
-
-    smooth=" true" smoothCount="5" smoothTolerance=".05" smoothThreshold="5"
-    
+    vr-mode-ui="enabled: false" smooth=" true" smoothCount="5" smoothTolerance=".05" smoothThreshold="5"
     sourceWidth="800" sourceHeight="600" displayWidth="1280" displayHeight="720">
 
-      
-        <a-marker type='barcode' value='0'>
-   
-            <a-text value="Hello !" 
-            side="double" position = "0 0 -1" rotation="270 0 0" 
-            width="8"
-            color="red" align="center" >
-            </a-text>
+    <a-assets>
+      <video id="MAIN2" src="assets/MAIN2.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <video id="CUBE" src="assets/CUBE.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <video id="DATA" src="assets/DATANOISE.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <video id="MIX" src="assets/MIX.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <video id="MOUV" src="assets/MOUV.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <video id="CARRE" src="assets/CARRE.mp4" autoplay="true" loop="true" preload="auto" controls="true"
+      muted="true" playsinline="" webkit-playsinline=""></video>
+      <audio id="sound2" src="assets/MAIN2.mp3" preload="auto"></audio>
+      <audio id="sound3" src="assets/CUBE.mp3" preload="auto"></audio>
+      <audio id="sound4" src="assets/DATA NOISE.mp3" preload="auto"></audio>
+    </a-assets>
 
-        </a-marker>
+    <a-marker audiohandler audioReference="#sound2" vidreference="#MAIN2" type="barcode" value="20"> 
+      <a-entity material="shader: chromakey; src: #MAIN2; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
 
-        <a-entity camera></a-entity>
+    <a-marker audiohandler audioReference="#sound3" vidreference="#CUBE" type="barcode" value="30"> 
+      <a-entity material="shader: chromakey; src: #CUBE; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
+
+    <a-marker audiohandler audioReference="#sound4" vidreference="#DATA" type="barcode" value="14"> 
+      <a-entity material="shader: chromakey; src: #DATA; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
+
+    <a-marker vidhandler vidreference="#MIX" type="barcode" value="11">
+      <a-entity material="shader: chromakey; src: #MIX; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
+
+    <a-marker vidhandler vidreference="#MOUV" type="barcode" value="12">
+      <a-entity material="shader: chromakey; src: #MOUV; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
+
+    <a-marker vidhandler vidreference="#CARRE" type="barcode" value="38">
+      <a-entity material="shader: chromakey; src: #CARRE; chroma:false; color: 0. 0. 0."
+        geometry="primitive: plane; width:  1.05; height:  1.05" position="0  0  0" rotation="270  0  0" side="double">
+      </a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
   </a-scene>
 </body>
+
 </html>
